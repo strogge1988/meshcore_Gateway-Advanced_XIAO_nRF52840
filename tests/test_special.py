@@ -83,6 +83,16 @@ class GatewayAdvancedPatchTests(unittest.TestCase):
         self.assertIn('temp_off = true;', source)
         self.assertIn('temp_until_ms', source)
 
+    def test_arduino_low_high_macro_collision_regression(self):
+        source = (ROOT/'overrides/GatewayAdvanced.cpp').read_text()
+        header = (ROOT/'tests/stubs/Arduino.h').read_text()
+        self.assertIn('#define LOW (0x0)', header)
+        self.assertIn('#define HIGH (0x1)', header)
+        self.assertIn('enum { FIELD_LOW, FIELD_HIGH, FIELD_RECOVERY }', source)
+        self.assertNotIn('enum { LOW, HIGH, RECOVERY }', source)
+        self.assertIn('field == FIELD_LOW', source)
+        self.assertIn('field == FIELD_HIGH', source)
+
     def test_expected_user_commands(self):
         source = (ROOT/'overrides/GatewayAdvanced.cpp').read_text()
         for name in ('get gateway', 'set gateway on', 'set gateway off', 'get powersafe',
