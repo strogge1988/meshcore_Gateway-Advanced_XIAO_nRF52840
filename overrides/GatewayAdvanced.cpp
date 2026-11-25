@@ -220,17 +220,17 @@ bool handleCommand(const char* command, char* reply) {
     return true;
   }
   const char *value = nullptr;
-  enum { LOW, HIGH, RECOVERY } field = LOW;
-  if (strncmp(command, "set powersafe.low ", 18) == 0) { field=LOW; value=command+18; }
-  else if (strncmp(command, "set powersafe.high ", 19) == 0) { field=HIGH; value=command+19; }
-  else if (strncmp(command, "set powersafe.recovery ", 23) == 0) { field=RECOVERY; value=command+23; }
+  enum { FIELD_LOW, FIELD_HIGH, FIELD_RECOVERY } field = FIELD_LOW;
+  if (strncmp(command, "set powersafe.low ", 18) == 0) { field=FIELD_LOW; value=command+18; }
+  else if (strncmp(command, "set powersafe.high ", 19) == 0) { field=FIELD_HIGH; value=command+19; }
+  else if (strncmp(command, "set powersafe.recovery ", 23) == 0) { field=FIELD_RECOVERY; value=command+23; }
   if (value) {
     long n = 0;
     if (!parseInt(value, &n)) { strcpy(reply, "ERR: invalid number"); return true; }
     Config previous = cfg;
-    if (field == LOW && n >= 3000 && n <= 3700) cfg.low_mv = n;
-    else if (field == HIGH && n >= 3000 && n <= 4200) cfg.high_mv = n;
-    else if (field == RECOVERY && n >= 30 && n <= 3600) cfg.recovery_secs = n;
+    if (field == FIELD_LOW && n >= 3000 && n <= 3700) cfg.low_mv = n;
+    else if (field == FIELD_HIGH && n >= 3000 && n <= 4200) cfg.high_mv = n;
+    else if (field == FIELD_RECOVERY && n >= 30 && n <= 3600) cfg.recovery_secs = n;
     else { strcpy(reply, "ERR: out of range"); return true; }
     if (!valid(cfg)) { cfg=previous; strcpy(reply, "ERR: high must exceed low by >150mV"); return true; }
     if (!save()) { cfg=previous; strcpy(reply, "ERR: save failed"); return true; }
