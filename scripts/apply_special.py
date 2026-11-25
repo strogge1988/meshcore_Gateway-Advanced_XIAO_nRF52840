@@ -13,7 +13,7 @@ MAIN_SETUP = 'void setup() {'
 MAIN_BEGIN = '  the_mesh.begin(fs);'
 MAIN_LOOP = '  the_mesh.loop();'
 MAIN_SLEEP = '  if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {'
-MESH_HEADER = '  void loop();\n#if defined(WITH_BRIDGE)'
+MESH_HEADER = '  void loop();'
 TARGET_RTC = '  rtc_clock.begin(Wire);'
 BOARD_WIRE = '  Wire.begin();'
 
@@ -44,7 +44,11 @@ def transform(files):
     main = replace_once(main, MAIN_SLEEP, '  if (!GatewayAdvanced::isRadioParked() && the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {', 'keep ADC/USB alive')
     cli = replace_once(cli, COMMONCLI_INCLUDE, COMMONCLI_INCLUDE + '\n#ifdef XIAO_GATEWAY_EXTRAS\n#include "GatewayAdvanced.h"\n#endif', 'common cli include')
     cli = replace_once(cli, COMMONCLI_HOOK, COMMONCLI_HOOK + '\n#ifdef XIAO_GATEWAY_EXTRAS\n    if (GatewayAdvanced::handleCommand(command, reply)) return;\n#endif', 'common cli hook')
-    mesh_h = replace_once(mesh_h, MESH_HEADER, '  void loop();\n#ifdef XIAO_GATEWAY_EXTRAS\n  bool gatewayBridgeIsRunning() const { return bridge.isRunning(); }\n#endif\n#if defined(WITH_BRIDGE)', 'bridge status helper')
+    # Patch at the unique public method declaration only. The upstream placement
+    # and whitespace of the following WITH_BRIDGE block may vary.
+    if '#if defined(WITH_BRIDGE)' not in mesh_h or 'void setBridgeState(bool enable) override' not in mesh_h:
+        raise ValueError('bridge status helper: expected standard upstream RS232 bridge API; refusing unsafe patch')
+    mesh_h = replace_once(mesh_h, MESH_HEADER, '  void loop();\n#if defined(XIAO_GATEWAY_EXTRAS) && defined(WITH_RS232_BRIDGE)\n  bool gatewayBridgeIsRunning() const { return bridge.isRunning(); }\n#endif', 'bridge status helper')
     target = replace_once(target, TARGET_RTC, '#ifndef XIAO_GATEWAY_EXTRAS\n  rtc_clock.begin(Wire);\n#endif', 'disable RTC probe during radio init')
     board = replace_once(board, BOARD_WIRE, '#ifndef XIAO_GATEWAY_EXTRAS\n  Wire.begin();\n#endif', 'reserve D6/D7 UART not I2C')
     files['variants/xiao_nrf52/target.cpp'] = target
