@@ -13,7 +13,8 @@ class GatewayAdvancedPatchTests(unittest.TestCase):
         self.files = {
             'examples/simple_repeater/main.cpp': '#include "MyMesh.h"\nvoid setup() {\n  sensors.begin();\n  the_mesh.begin(fs);\n}\nvoid loop() {\n  the_mesh.loop();\n  sensors.loop();\n  if (the_mesh.getNodePrefs()->powersaving_enabled && !the_mesh.hasPendingWork()) {\n  }\n}\n',
             'src/helpers/CommonCLI.cpp': '#include "CommonCLI.h"\nvoid CommonCLI::handleCommand(uint32_t sender_timestamp, char* command, char* reply) {\n}\n',
-            'examples/simple_repeater/MyMesh.h': '  void loop();\n#if defined(WITH_BRIDGE)\n',
+            'examples/simple_repeater/MyMesh.h': ('  void loop();\n\n#if defined(WITH_BRIDGE)\n'
+                                                 '  void setBridgeState(bool enable) override {\n  }\n'),
             'variants/xiao_nrf52/target.cpp': '  rtc_clock.begin(Wire);\n',
             'variants/xiao_nrf52/XiaoNrf52Board.cpp': '  Wire.begin();\n',
         }
@@ -27,6 +28,26 @@ class GatewayAdvancedPatchTests(unittest.TestCase):
         self.assertIn('gatewayBridgeIsRunning()', result['examples/simple_repeater/MyMesh.h'])
         self.assertIn('#ifndef XIAO_GATEWAY_EXTRAS', result['variants/xiao_nrf52/target.cpp'])
         self.assertIn('#ifndef XIAO_GATEWAY_EXTRAS', result['variants/xiao_nrf52/XiaoNrf52Board.cpp'])
+
+    def test_bridge_header_upstream_whitespace_regression(self):
+        # v2 patch was too strict about the lines immediately following loop().
+        for following in ('\n#if defined(WITH_BRIDGE)',
+                          '\n\n#if defined(WITH_BRIDGE)',
+                          '\n  #if defined(WITH_BRIDGE)',
+                          '\r\n#if defined(WITH_BRIDGE)'):
+            files = self.files.copy()
+            files['examples/simple_repeater/MyMesh.h'] = (
+                'public:\n  void loop();' + following +
+                '\n  void setBridgeState(bool enable) override { }\n')
+            updated = apply_special.transform(files)['examples/simple_repeater/MyMesh.h']
+            self.assertEqual(updated.count('gatewayBridgeIsRunning() const'), 1)
+            self.assertIn('void setBridgeState(bool enable) override', updated)
+            self.assertIn('WITH_RS232_BRIDGE', updated)
+
+    def test_reject_missing_bridge_api(self):
+        self.files['examples/simple_repeater/MyMesh.h'] = '  void loop();\n'
+        with self.assertRaisesRegex(ValueError, 'bridge status helper'):
+            apply_special.transform(self.files)
 
     def test_reject_double_application(self):
         with self.assertRaises(ValueError):
