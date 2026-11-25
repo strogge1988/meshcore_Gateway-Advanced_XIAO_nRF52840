@@ -26,6 +26,30 @@ Dies ist ein **inoffizielles Community-Projekt**, keine offizielle MeshCore-Firm
 
 **Wichtig:** Beide USB-Anschlüsse können intern LiPo-Ladeelektronik speisen. Bei gemeinsamem Akkupack muss unbeabsichtigtes paralleles Laden über USB und externen TP4056 vermieden werden.
 
+## Konfiguration der beiden Repeater
+
+Beide XIAOs erhalten eine eigene LoRa-Konfiguration über die **offizielle MeshCore-CLI**. Danach auf **beiden** Geräten beispielsweise:
+
+```text
+get bridge.type
+set bridge.baud 115200
+set bridge.source tx
+set bridge.enabled on
+set repeat on
+```
+
+`bridge.source tx` bestimmt, **welche lokalen Pakete zur Bridge gespiegelt werden**: diejenigen, die der Repeater tatsächlich zur LoRa-Aussendung auswählt. Es setzt die UART-Verbindung **nicht** auf unidirektional; TX und RX sind über Kreuz verdrahtet und die Bridge kann in **beide** Richtungen arbeiten. **Hinweis zu MeshCore 1.18.0:** `get bridge.source` zeigt den TX-Modus als `logTx` an, obwohl der hier verwendete Set-Befehl `tx` lautet.
+
+Mit `set bridge.enabled off` lässt sich die UART-Bridge an einem Board abschalten, während das Gerät normaler Repeater bleiben kann. Für eine kontrollierte Abschaltung des gesamten Gateways beide Seiten deaktivieren. Die Regions-Konfiguration und Funkparameter bleiben getrennte MeshCore-Einstellungen; konkrete Befehle stehen in der verlinkten offiziellen CLI-Referenz.
+
+### Verhalten von Paketen und Regions
+
+- Die Bridge **übersetzt keine Regions** und erzeugt keine neue Nachricht im Namen des Gateways.
+- MeshCore-Routing, Pfade und Duplikaterkennung arbeiten weiterhin nach den Regeln der jeweils ausgecheckten Firmware.
+- `bridge.source tx` ist **kein strenger Firewall- oder Whitelist-Filter**. Insbesondere Direct Messages können nicht allein über Flood-Regions gefiltert werden.
+- Mehrere parallel betriebene Gateways können dieselbe Nachricht mehrfach über Funk aussenden; die normale Duplikaterkennung unterdrückt Kopien nur, solange die zugehörigen Einträge noch gespeichert sind. Vermeidung jeglicher Funkduplikate wird **nicht garantiert**.
+
+
 ## Zusätzliche Advanced-Befehle
 
 Diese Befehle **gehören nicht zum offiziellen MeshCore**. Sie werden im gemeinsamen `CommonCLI::handleCommand()` eingehängt, der sowohl von der lokalen seriellen Konsole als auch von der **bereits authentifizierten** MeshCore-Remote-CLI aufgerufen wird. Remote-Zugang und Rückroute müssen funktionieren; keine zusätzlichen Berechtigungen werden umgangen.
@@ -63,6 +87,8 @@ PowerSafe stoppt den LoRa-Funkbetrieb und pausiert währenddessen die UART-Bridg
 Zur Reset-Unterscheidung wird früh `NRF_POWER->RESETREAS` ausgelesen und anschließend gelöscht. Ein **SREQ**-Software-Reset wird als gewünschter Zustandserhalt behandelt; Watchdog, Reset-Pin und nicht sicher erkannte Neustarts führen vorsichtshalber zur Aktivierung der Bridge. **Grenze:** Bootloader können Reset-Indikatoren beeinflussen. Ein starker Spannungseinbruch ohne vollständiges Power-on kann anders klassifiziert werden; die Logik kann einen hängenden oder stromlosen nRF52840 nicht eigenständig wiederbeleben.
 
 **Remote-Warnung:** `set gateway off` kann gerade den Verbindungsweg unterbrechen, über den der Befehl geschickt wurde. Auch `set gateway off 300` kann die unmittelbare Antwort unterbrechen; nach Ablauf der Zeit wird aber automatisch reaktiviert, sofern der Controller läuft. Deshalb zunächst vor Ort über USB testen.
+
+
 
 ## Gemeinsame Solarversorgung
 
