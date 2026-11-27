@@ -1,4 +1,4 @@
-name: Build Meshcore Gateway - Advanced
+name: Build Meshcore Gateway - Advanced v5 (Diagnostics + OTA)
 on:
   workflow_dispatch:
     inputs:
@@ -21,6 +21,8 @@ jobs:
         run: python3 -m unittest discover -s tests -v
       - name: Syntax check of Advanced C++ module with host interface stubs
         run: g++ -std=c++17 -fsyntax-only -Wall -Wextra -I tests/stubs -I overrides overrides/GatewayAdvanced.cpp
+      - name: Compile diagnostics module on host
+        run: g++ -std=c++17 -Wall -Wextra -Werror -fsyntax-only -I overrides overrides/GatewayDiagnostics.cpp
       - name: Resolve official upstream repeater version
         id: upstream
         shell: bash
@@ -43,10 +45,16 @@ jobs:
           fi
       - name: Apply experimental gateway/powersafe features
         run: python3 scripts/apply_special.py firmware
+      - name: Instrument UART and radio decision points (no routing changes)
+        run: python3 scripts/apply_diagnostics.py firmware
       - name: Validate the installed Advanced module
         shell: bash
         run: |
           set -euo pipefail
+          test -s firmware/examples/simple_repeater/GatewayDiagnostics.cpp
+          grep -Fq 'UART_RX_BAD_CRC' firmware/src/helpers/bridges/RS232Bridge.cpp
+          grep -Fq 'UART_RX_DUP' firmware/src/helpers/bridges/BridgeBase.cpp
+          grep -Fq 'LORA_TX_FAIL' firmware/examples/simple_repeater/MyMesh.cpp
           test -s firmware/examples/simple_repeater/GatewayAdvanced.cpp
           test -s firmware/examples/simple_repeater/GatewayAdvanced.h
           grep -Fq "GatewayAdvanced::handleCommand" firmware/src/helpers/CommonCLI.cpp
@@ -72,18 +80,37 @@ jobs:
           test -s "$DIR/firmware.hex"
           python firmware/bin/uf2conv/uf2conv.py "$DIR/firmware.hex" -c -o "$DIR/firmware.uf2" -f 0xADA52840
           test -s "$DIR/firmware.uf2"
+      - name: Build application-only BLE DFU ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install adafruit-nrfutil
+          DIR=firmware/.pio/build/Xiao_nrf52_repeater_rs232
+          test -s "$DIR/firmware.hex"
+          adafruit-nrfutil dfu genpkg --dev-type 0x0052 --application "$DIR/firmware.hex" "$DIR/firmware-dfu.zip"
+          python3 - "$DIR/firmware-dfu.zip" <<'PYDFU'
+          import json, sys, zipfile
+          with zipfile.ZipFile(sys.argv[1]) as z:
+              assert z.testzip() is None
+              manifest=json.loads(z.read('manifest.json'))['manifest']
+              assert 'application' in manifest and 'bootloader' not in manifest and 'softdevice' not in manifest, manifest
+              for k in ('bin_file','dat_file'):
+                  assert manifest['application'][k] in z.namelist(), k
+          print('Application-only DFU ZIP validated')
+          PYDFU
       - name: Write build metadata
         shell: bash
         run: |
           set -euo pipefail
           DIR=firmware/.pio/build/Xiao_nrf52_repeater_rs232
-          printf 'variant=Meshcore Gateway - Advanced\nupstream_tag=%s\nupstream_commit=%s\n' \
+          printf 'variant=Meshcore Gateway - Advanced v5\nupstream_tag=%s\nupstream_commit=%s\nfeatures=uart_diagnostics,remote_cli,application_dfu_zip\n' \
             '${{ steps.upstream.outputs.tag }}' "$(git -C firmware rev-parse HEAD)" > "$DIR/build_info.txt"
       - name: Upload firmware images
         uses: actions/upload-artifact@v4
         with:
           name: Meshcore-Gateway-Advanced-${{ steps.upstream.outputs.tag }}
           path: |
+            firmware/.pio/build/Xiao_nrf52_repeater_rs232/firmware-dfu.zip
             firmware/.pio/build/Xiao_nrf52_repeater_rs232/firmware.uf2
             firmware/.pio/build/Xiao_nrf52_repeater_rs232/firmware.bin
             firmware/.pio/build/Xiao_nrf52_repeater_rs232/build_info.txt
