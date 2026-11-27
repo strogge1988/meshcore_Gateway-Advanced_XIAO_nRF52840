@@ -67,7 +67,7 @@ def main():
     result = transform(files)
     src = Path(__file__).resolve().parent.parent/'overrides'
     dest = root/'examples/simple_repeater'
-    for name in ('GatewayAdvanced.h','GatewayAdvanced.cpp'):
+    for name in ('GatewayAdvanced.h','GatewayAdvanced.cpp','GatewayDiagnostics.h','GatewayDiagnostics.cpp'):
         if (dest/name).exists():
             raise ValueError(f'Unexpected upstream file {name}; refusing to overwrite')
         if not (src/name).is_file():
@@ -75,7 +75,7 @@ def main():
     # Only modify after all source-file checks passed.
     for p, content in result.items():
         (root/p).write_text(content, encoding='utf-8')
-    for name in ('GatewayAdvanced.h','GatewayAdvanced.cpp'):
+    for name in ('GatewayAdvanced.h','GatewayAdvanced.cpp','GatewayDiagnostics.h','GatewayDiagnostics.cpp'):
         (dest/name).write_bytes((src/name).read_bytes())
     print('Advanced patch applied to officially pinned MeshCore 1.18.0.')
 
