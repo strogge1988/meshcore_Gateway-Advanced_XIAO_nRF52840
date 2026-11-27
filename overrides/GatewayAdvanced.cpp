@@ -4,6 +4,7 @@
 #include <string.h>
 #include <nrf.h>
 #include "GatewayAdvanced.h"
+#include "GatewayDiagnostics.h"
 #include "MyMesh.h"
 
 extern MyMesh the_mesh;
@@ -165,6 +166,7 @@ static bool parseInt(const char *s, long *value) {
 }
 
 bool handleCommand(const char* command, char* reply) {
+  if (GatewayDiagnostics::handleCommand(command, reply)) return true;
   NodePrefs* prefs = the_mesh.getNodePrefs();
   if (strcmp(command, "get gateway") == 0) {
     snprintf(reply, 160, "> gateway:%s effective:%s", prefs->bridge_enabled?"on":"off", the_mesh.gatewayBridgeIsRunning()?"on":"off");
