@@ -12,7 +12,9 @@ checks = {
     'variants/xiao_nrf52/XiaoNrf52Board.cpp': ('Wire.begin();',),
     'examples/simple_repeater/MyMesh.h': ('void loop();', 'WITH_BRIDGE'),
     'src/helpers/CommonCLI.cpp': ('void CommonCLI::handleCommand(', '#include "CommonCLI.h"'),
-    'src/helpers/bridges/RS232Bridge.cpp': ('RS232Bridge::begin()', 'RS232Bridge::sendPacket'),
+    'src/helpers/bridges/RS232Bridge.cpp': ('RS232Bridge::begin()', 'RS232Bridge::sendPacket', 'validateChecksum', '_seen_packets.wasSeen'),
+    'src/helpers/bridges/BridgeBase.cpp': ('BridgeBase::handleReceivedPacket', 'queueInbound', '_seen_packets.wasSeen'),
+    'examples/simple_repeater/MyMesh.cpp': ('void MyMesh::logTx', 'void MyMesh::logRx', 'void MyMesh::logTxFail'),
 }
 for path, anchors in checks.items():
     src=f/path
